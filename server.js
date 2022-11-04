@@ -1,24 +1,40 @@
 const express = require('express')
 const app = express()
 const port = 3000
+const cors = require('cors')
 
 const {ClarifaiStub, grpc} = require("clarifai-nodejs-grpc");
 const stub = ClarifaiStub.grpc();
 const metadata = new grpc.Metadata();
 metadata.set("authorization", "Key 07261570e02b4e96846724a6a284c766");
 
+app.use(express.json())
+app.use(express.urlencoded());
+app.use(cors({origin: 'http://127.0.0.1:5500'}))
+
+
 app.get('/', (req, res) => {
   res.send('Hello World!')
 })
-app.get('/clarifai', (req,res) => {
+app.post('/clarifai', (req,finalRes) => {
+    const {imageUrl, category} = req.body;
+    console.log(req.body);
+    if (!imageUrl) return;
+
+    let model_id = 'food-item-recognition';
+    if (category == 'food') {
+        model_id = 'food-item-recognition';
+    } else if (category == 'apparel') {
+        model_id = 'apparel-detection';
+    }
 
     stub.PostModelOutputs(
         {
-            model_id: "food-item-recognition",
+            model_id,
             inputs: [
                 {
                     data: {
-                        image: {url: "https://images.unsplash.com/photo-1528825871115-3581a5387919?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=715&q=80"}
+                        image: {url: imageUrl}
                     }
                 }
             ]
@@ -35,9 +51,12 @@ app.get('/clarifai', (req,res) => {
             }
 
             console.log("Predicted concepts, with confidence values:");
-            for (const c of res.outputs[0].data.concepts) {
-                console.log(c.name + ": " + c.value);
-            }
+            console.log(res.outputs[0].data.regions);
+            categoryID = ''
+            if (category == 'food') categoryID = 'concepts'
+            else categoryID = 'regions';
+            
+            return finalRes.status(200).json(res.outputs[0].data[categoryID]);
         }
     )
 })
